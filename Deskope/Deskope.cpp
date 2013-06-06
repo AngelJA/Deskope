@@ -67,7 +67,7 @@ BOOL CDeskopeApp::InitInstance()
 	// Change the registry key under which our settings are stored
 	// TODO: You should modify this string to be something appropriate
 	// such as the name of your company or organization
-	SetRegistryKey(_T("Deskope"));
+	SetRegistryKey(L"Deskope");
 	
 	CDeskopeDlg dlg;
 	m_pMainWnd = &dlg;

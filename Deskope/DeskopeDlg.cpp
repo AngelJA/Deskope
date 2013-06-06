@@ -57,14 +57,14 @@ CDeskopeDlg::CDeskopeDlg(CWnd* pParent /*=NULL*/)
 void CDeskopeDlg::DoDataExchange(CDataExchange* pDX)
 {
 	CDialogEx::DoDataExchange(pDX);
-	m_csRiftData.Format(_T("Yaw: %.1f° %cPitch: %.1f° %cRoll: %.1f°"), m_fltYaw, char(10), m_fltPitch, char(10), m_fltRoll); 
+	m_csRiftData.Format(L"Yaw: %.1f° %cPitch: %.1f° %cRoll: %.1f°", m_fltYaw, char(10), m_fltPitch, char(10), m_fltRoll); 
 
 	if (ImageSeparation)
-		m_csImageSeparation.Format(_T("%d"), ImageSeparation.GetPos());
+		m_csImageSeparation.Format(L"%d", ImageSeparation.GetPos());
 	if (PixelsPerDegree)
-		m_csPixelsPerDegree.Format(_T("%d"), PixelsPerDegree.GetPos());
+		m_csPixelsPerDegree.Format(L"%d", PixelsPerDegree.GetPos());
 	if (Zoom)
-		m_csZoom.Format(_T("%.1f"), Zoom.GetPos() * 0.1);
+		m_csZoom.Format(L"%.1f", Zoom.GetPos() * 0.1);
 
 	DDX_Text(pDX, IDC_RIFT_SENSOR_DATA, m_csRiftData);
 	DDX_Text(pDX, IDC_IMAGE_SEPARATION_BOX, m_csImageSeparation);
@@ -75,16 +75,18 @@ void CDeskopeDlg::DoDataExchange(CDataExchange* pDX)
 	DDX_Control(pDX, IDC_RESTRICTCURSOR, RestrictCursor);
 	DDX_Control(pDX, IDC_IMAGE_SEPARATION_BOX, ImageSeparationBox);
 	DDX_Control(pDX, IDC_PIXELS_PER_DEGREE_BOX, PixelsPerDegreeBox);
-	DDX_Control(pDX, IDC_START_STOP_SCOPE, OnOffButton);
 	DDX_Control(pDX, IDC_SideBySideCheck, SBS3DMode);
 	DDX_Control(pDX, IDC_SideBySideWidth, SideBySideWidth);
+	DDX_Control(pDX, IDC_SCREENCAPTURERATE_BOX, ScreenCaptureRate);
 	DDX_Control(pDX, IDC_ZOOM, Zoom);
-	DDX_Control(pDX, IDC_DISABLE_AERO, DisableAero);
+	DDX_Control(pDX, IDC_DISABLE_COMPOSITION, DisableComposition);
+	DDX_Control(pDX, IDC_ENABLE_TRACKING, TrackingEnabled);
 }
 
 BEGIN_MESSAGE_MAP(CDeskopeDlg, CDialogEx)
 	ON_WM_SYSCOMMAND()
 	ON_WM_PAINT()
+	ON_WM_HOTKEY()
 	ON_WM_DESTROY()
 	ON_WM_HSCROLL()
 	ON_WM_QUERYDRAGICON()
@@ -92,14 +94,14 @@ BEGIN_MESSAGE_MAP(CDeskopeDlg, CDialogEx)
 	ON_MESSAGE(WM_DESKOPE_SCOPE_HANDLE, ReceiveScopeHandle)
 	ON_MESSAGE(WM_RIFT_SENSOR_DATA, ReceiveRiftSensorData)
 	ON_BN_CLICKED(IDOK, &CDeskopeDlg::OnBnClickedOk)
-	ON_BN_CLICKED(IDC_START_STOP_SCOPE, &CDeskopeDlg::OnBnClickedStartStopScope)
 	ON_BN_CLICKED(IDC_RESTRICTCURSOR, &CDeskopeDlg::OnBnClickedRestrictcursor)
-	ON_EN_CHANGE(IDC_PIXELS_PER_DEGREE_BOX, &CDeskopeDlg::OnEnChangePixelsPerDegreeBox)
-	ON_EN_CHANGE(IDC_IMAGE_SEPARATION_BOX, &CDeskopeDlg::OnEnChangeImageSeparationBox)
 	ON_BN_CLICKED(IDC_RESET_ORIENTATION, &CDeskopeDlg::OnBnClickedResetOrientation)
 	ON_BN_CLICKED(IDC_SideBySideCheck, &CDeskopeDlg::OnBnClickedSidebysidecheck)
-	ON_EN_CHANGE(IDC_SideBySideWidth, &CDeskopeDlg::OnEnChangeSidebysidewidth)
-	ON_BN_CLICKED(IDC_DISABLE_AERO, &CDeskopeDlg::OnBnClickedDisableAero)
+	ON_BN_CLICKED(IDC_DISABLE_COMPOSITION, &CDeskopeDlg::OnBnClickedDisableComposition)
+	ON_BN_CLICKED(IDC_ENABLE_TRACKING, &CDeskopeDlg::OnBnClickedEnableTracking)
+	ON_NOTIFY_EX( TTN_NEEDTEXTW, 0, ToolTipFunction )
+	ON_BN_CLICKED(IDC_APPLYBUTTON, &CDeskopeDlg::OnBnClickedApplybutton)
+	ON_BN_CLICKED(IDC_HOTKEYSBUTTON, &CDeskopeDlg::OnBnClickedHotkeysbutton)
 END_MESSAGE_MAP()
 
 
@@ -108,6 +110,8 @@ END_MESSAGE_MAP()
 BOOL CDeskopeDlg::OnInitDialog()
 {
 	CDialogEx::OnInitDialog();
+
+	EnableToolTips();
 
 	// Add "About..." menu item to system menu.
 
@@ -134,40 +138,54 @@ BOOL CDeskopeDlg::OnInitDialog()
 	SetIcon(m_hIcon, TRUE);			// Set big icon
 	SetIcon(m_hIcon, FALSE);		// Set small icon
 
-	//Settings Stuff
-		//TEST
-		CString strSection       = _T("Settings");
-		CString strStringItem    = _T("My String Item");
-		CString strIntItem       = _T("My Int Item");
+	// Setup hotkeys
+	RegisterHotKey(GetSafeHwnd(), HK_SBS3D, MOD_NOREPEAT | MOD_WIN, 0x5A); // Windows + Z
+	RegisterHotKey(GetSafeHwnd(), HK_CENTER_SCREEN, MOD_NOREPEAT | MOD_WIN, 0X43); // Windows + C
+	RegisterHotKey(GetSafeHwnd(), HK_RESTRICT_CURSOR, MOD_NOREPEAT | MOD_WIN, 0X58); // Windows + X
 
-		CWinApp* pApp = &theApp;
+	// Initialize controls with settings from registry
+	Zoom.SetRange(GetRegistryInt(REG_ZOOM_MIN, DEFAULT_ZOOM_MIN),
+				  GetRegistryInt(REG_ZOOM_MAX, DEFAULT_ZOOM_MAX));
+	Zoom.SetPos(GetRegistryInt(REG_ZOOM, DEFAULT_ZOOM));
+	
+	ImageSeparation.SetRange(GetRegistryInt(REG_SEPARATION_MIN, DEFAULT_SEPARATION_MIN),
+							 GetRegistryInt(REG_SEPARATION_MAX, DEFAULT_SEPARATION_MAX));
+	ImageSeparation.SetPos(GetRegistryInt(REG_SEPARATION, DEFAULT_SEPARATION));
 
-		pApp->WriteProfileString(_T("Settings") /*strSection*/, strStringItem, _T("test"));
+	PixelsPerDegree.SetRange(GetRegistryInt(REG_PPD_MIN, DEFAULT_PPD_MIN),
+							 GetRegistryInt(REG_PPD_MAX, DEFAULT_PPD_MAX));
+	PixelsPerDegree.SetPos(GetRegistryInt(REG_PPD, DEFAULT_PPD));
+	
+	RestrictCursor.SetCheck(GetRegistryInt(REG_CLIP_CURSOR, DEFAULT_CLIP_CURSOR));
+	SBS3DMode.SetCheck(GetRegistryInt(REG_SBS_MODE, DEFAULT_SBS_MODE));
+	DisableComposition.SetCheck(GetRegistryInt(REG_DISABLE_COMPOSITION, DEFAULT_DISABLE_COMPOSITION));
+	TrackingEnabled.SetCheck(GetRegistryInt(REG_TRACKING_ENABLED, DEFAULT_TRACKING_ENABLED));
 
-		CString strValue;
-		strValue = pApp->GetProfileString(strSection, strStringItem);
-		ASSERT(strValue == _T("test"));
+	CStringW strSBSWidth;
+	strSBSWidth.Format(L"%d", GetRegistryInt(REG_SBS_WIDTH, DEFAULT_SBS_WIDTH));
+	SideBySideWidth.SetWindowTextW(strSBSWidth);
 
-		pApp->WriteProfileInt(strSection, strIntItem, 1234);
-		int nValue;
-		nValue = pApp->GetProfileInt(strSection, strIntItem, 0);
-		ASSERT(nValue == 1234);
-	//ENDTEST
-
-	// Initialize controls
-	Zoom.SetRange(1, 20);
-	Zoom.SetPos(10);
-	ImageSeparation.SetRange(DEFAULT_SEPARATION - 50, DEFAULT_SEPARATION + 50, TRUE);
-	ImageSeparation.SetPos(DEFAULT_SEPARATION);
-	PixelsPerDegree.SetRange(10, 40, TRUE);
-	PixelsPerDegree.SetPos(DEFAULT_PIXELS_PER_DEGREE);
-	RestrictCursor.SetCheck(DEFAULT_CLIP_CURSOR);
-	SideBySideWidth.SetWindowTextW(_T("1280"));
+	CStringW strCaptureRate;
+	strCaptureRate.Format(L"%d", GetRegistryInt(REG_SCREEN_CAP_RATE, DEFAULT_SCREEN_CAPTURE_RATE));
+	ScreenCaptureRate.SetWindowTextW(strCaptureRate);
 
 	// Start the Scope window in another thread
 	m_hScopeThread = AfxBeginThread(Scope::RunScopeWindow, this->GetSafeHwnd())->m_hThread;
 
 	return TRUE;  // return TRUE  unless you set the focus to a control
+}
+
+
+// get registry int or write default value to registry and return it
+int CDeskopeDlg::GetRegistryInt(CStringW strEntry, int intDefault)
+{
+	int intValue = theApp.GetProfileIntW(REG_SECTION, strEntry, -1);
+	if (intValue < 0)
+	{
+		theApp.WriteProfileInt(REG_SECTION, strEntry, intDefault);
+		return intDefault;
+	}
+	return intValue;
 }
 
 void CDeskopeDlg::OnSysCommand(UINT nID, LPARAM lParam)
@@ -193,7 +211,7 @@ void CDeskopeDlg::OnPaint()
 	{
 		CPaintDC dc(this); // device context for painting
 
-		SendMessage(WM_ICONERASEBKGND, reinterpret_cast<WPARAM>(dc.GetSafeHdc()), 0);
+		SendMessageW(WM_ICONERASEBKGND, reinterpret_cast<WPARAM>(dc.GetSafeHdc()), 0);
 
 		// Center icon in client rectangle
 		int cxIcon = GetSystemMetrics(SM_CXICON);
@@ -224,6 +242,16 @@ void CDeskopeDlg::OnDestroy()
 LRESULT CDeskopeDlg::ReceiveScopeHandle(WPARAM wParam, LPARAM lParam)
 {
 	m_hwndScope = (HWND)wParam;
+	::PostMessageW(m_hwndScope, WM_DESKOPE_VALUE_CHANGE, IMAGE_SEPARATION, ImageSeparation.GetPos());
+	::PostMessageW(m_hwndScope, WM_DESKOPE_VALUE_CHANGE, PIXELS_PER_DEGREE, PixelsPerDegree.GetPos());
+	float fltZoom = float(Zoom.GetPos() * 0.1);
+	::PostMessageW(m_hwndScope, WM_DESKOPE_VALUE_CHANGE, ZOOM, reinterpret_cast<LPARAM&>(fltZoom));	
+	OnBnClickedRestrictcursor();
+	OnBnClickedSidebysidecheck();
+	OnBnClickedDisableComposition();
+	OnBnClickedEnableTracking();
+	SendSBSInfo();
+	SendCaptureRate();
 	return 0;
 }
 
@@ -232,13 +260,13 @@ LRESULT CDeskopeDlg::ReceiveRiftSensorData(WPARAM wParam, LPARAM lParam)
 	switch(wParam)
 	{
 	case RSD_YAW:
-		m_fltYaw = float(reinterpret_cast<float&>(lParam) * 180.0 / 3.14159);
+		m_fltYaw = float(reinterpret_cast<float&>(lParam) * 180.0 / PI);
 		break;
 	case RSD_PITCH:
-		m_fltPitch = float(reinterpret_cast<float&>(lParam) * 180.0 / 3.14159);
+		m_fltPitch = float(reinterpret_cast<float&>(lParam) * 180.0 / PI);
 		break;
 	case RSD_ROLL:
-		m_fltRoll = float(reinterpret_cast<float&>(lParam) * 180.0 / 3.14159);
+		m_fltRoll = float(reinterpret_cast<float&>(lParam) * 180.0 / PI);
 		break;
 	}
 	
@@ -255,25 +283,27 @@ HCURSOR CDeskopeDlg::OnQueryDragIcon()
 
 void CDeskopeDlg::OnBnClickedCancel()
 {
-	// TODO: Add your control notification handler code here
+	// save settings
+	CStringW strSBSOffset;
+	SideBySideWidth.GetWindowTextW(strSBSOffset);
+	CStringW strCaptureRate;
+	ScreenCaptureRate.GetWindowTextW(strCaptureRate);
+	theApp.WriteProfileInt(REG_SECTION, REG_SEPARATION, ImageSeparation.GetPos());
+	theApp.WriteProfileInt(REG_SECTION, REG_PPD, PixelsPerDegree.GetPos());
+	theApp.WriteProfileInt(REG_SECTION, REG_ZOOM, Zoom.GetPos());
+	theApp.WriteProfileInt(REG_SECTION, REG_SBS_MODE, SBS3DMode.GetCheck());
+	theApp.WriteProfileInt(REG_SECTION, REG_SBS_WIDTH, _wtoi(strSBSOffset));
+	theApp.WriteProfileInt(REG_SECTION, REG_SCREEN_CAP_RATE, _wtoi(strCaptureRate));
+	theApp.WriteProfileInt(REG_SECTION, REG_CLIP_CURSOR, RestrictCursor.GetCheck());
+	theApp.WriteProfileInt(REG_SECTION, REG_DISABLE_COMPOSITION, DisableComposition.GetCheck());
+	theApp.WriteProfileInt(REG_SECTION, REG_TRACKING_ENABLED, TrackingEnabled.GetCheck());
+
 	CDialogEx::OnCancel();
 }
 
-
-
 void CDeskopeDlg::OnBnClickedOk()
 {
-	// TODO: Add your control notification handler code here
-	CDialogEx::OnOK();
-}
-
-
-void CDeskopeDlg::OnBnClickedStartStopScope()
-{
-	if (m_hScopeThread)
-		Scope::CloseScopeWindow(m_hwndScope, &m_hScopeThread);
-	else
-		m_hScopeThread = AfxBeginThread(Scope::RunScopeWindow, this->GetSafeHwnd())->m_hThread;
+	OnBnClickedApplybutton();
 }
 
 void CDeskopeDlg::OnHScroll(UINT nSBCode, UINT nPos, CScrollBar* pScrollBar)
@@ -281,44 +311,27 @@ void CDeskopeDlg::OnHScroll(UINT nSBCode, UINT nPos, CScrollBar* pScrollBar)
 	CSliderCtrl* pSlider = reinterpret_cast<CSliderCtrl*>(pScrollBar);
 	if (pSlider == &ImageSeparation)
 	{
-		::PostMessage(m_hwndScope, WM_DESKOPE_VALUE_CHANGE, IMAGE_SEPARATION, pSlider->GetPos());
+		::PostMessageW(m_hwndScope, WM_DESKOPE_VALUE_CHANGE, IMAGE_SEPARATION, pSlider->GetPos());
 	}
 	else if (pSlider == &PixelsPerDegree)
 	{
-		::PostMessage(m_hwndScope, WM_DESKOPE_VALUE_CHANGE, PIXELS_PER_DEGREE, pSlider->GetPos());
+		::PostMessageW(m_hwndScope, WM_DESKOPE_VALUE_CHANGE, PIXELS_PER_DEGREE, pSlider->GetPos());
 	}
 	else if (pSlider == &Zoom)
 	{
 		float fltZoom = float(pSlider->GetPos() * 0.1);
-		::PostMessage(m_hwndScope, WM_DESKOPE_VALUE_CHANGE, ZOOM, reinterpret_cast<LPARAM&>(fltZoom));
+		::PostMessageW(m_hwndScope, WM_DESKOPE_VALUE_CHANGE, ZOOM, reinterpret_cast<LPARAM&>(fltZoom));
 	}
 }
 
 void CDeskopeDlg::OnBnClickedRestrictcursor()
 {
-	::PostMessage(m_hwndScope, WM_DESKOPE_VALUE_CHANGE, CLIP_CURSOR, RestrictCursor.GetCheck());
+	::PostMessageW(m_hwndScope, WM_DESKOPE_VALUE_CHANGE, CLIP_CURSOR, RestrictCursor.GetCheck());
 }
-
-
-void CDeskopeDlg::OnEnChangePixelsPerDegreeBox()
-{
-	CString PPDText;
-	PixelsPerDegreeBox.GetWindowTextW(PPDText);
-	PixelsPerDegree.SetPos(_wtoi(PPDText));
-}
-
-
-void CDeskopeDlg::OnEnChangeImageSeparationBox()
-{
-	CString ImageSeparationText;
-	ImageSeparationBox.GetWindowTextW(ImageSeparationText);
-	ImageSeparation.SetPos(_wtoi(ImageSeparationText));
-}
-
 
 void CDeskopeDlg::OnBnClickedResetOrientation()
 {
-	::PostMessage(m_hwndScope, WM_DESKOPE_VALUE_CHANGE, RSD_RESET, NULL);
+	::PostMessageW(m_hwndScope, WM_DESKOPE_VALUE_CHANGE, RSD_RESET, NULL);
 }
 
 
@@ -327,24 +340,96 @@ void CDeskopeDlg::OnBnClickedSidebysidecheck()
 	SendSBSInfo();
 }
 
-void CDeskopeDlg::OnEnChangeSidebysidewidth()
-{
-	SendSBSInfo();
-}
-
 void CDeskopeDlg::SendSBSInfo()
 {
-	CString SBSOffsetText;
-	SideBySideWidth.GetWindowTextW(SBSOffsetText);
-	::PostMessage(m_hwndScope, WM_DESKOPE_VALUE_CHANGE, SBS_OFFSET, SBS3DMode.GetCheck() ? _wtoi(SBSOffsetText) / 2 : 0);
+	CStringW strSBSOffset;
+	SideBySideWidth.GetWindowTextW(strSBSOffset);
+	::PostMessageW(m_hwndScope, WM_DESKOPE_VALUE_CHANGE, SBS_OFFSET, SBS3DMode.GetCheck() ? _wtoi(strSBSOffset) / 2 : 0);
 }
 
-
-
-void CDeskopeDlg::OnBnClickedDisableAero()
+void CDeskopeDlg::SendCaptureRate()
 {
-	if (DisableAero.GetCheck())
+	CStringW strCaptureRate;
+	ScreenCaptureRate.GetWindowTextW(strCaptureRate);
+	int intCaptureRate = _wtoi(strCaptureRate);
+	if (intCaptureRate < 1 || intCaptureRate > 1000) {
+		MessageBoxW(L"Invalid frame rate.", L"Error", MB_OK | MB_ICONERROR | MB_SYSTEMMODAL);
+	}
+	else
+		::PostMessage(m_hwndScope, WM_DESKOPE_VALUE_CHANGE, SCREENCAPTURERATE, intCaptureRate);
+}
+
+void CDeskopeDlg::OnBnClickedDisableComposition()
+{
+	if (DisableComposition.GetCheck())
 		DwmEnableComposition(DWM_EC_DISABLECOMPOSITION);
 	else
 		DwmEnableComposition(DWM_EC_ENABLECOMPOSITION);
+}
+
+
+void CDeskopeDlg::OnBnClickedEnableTracking()
+{
+	::PostMessageW(m_hwndScope, WM_DESKOPE_VALUE_CHANGE, TRACKING, TrackingEnabled.GetCheck());
+}
+
+// set tool tip text depending on the control being hovered over
+BOOL CDeskopeDlg::ToolTipFunction(UINT id, NMHDR* pTTTStruct, LRESULT* pResult)
+{
+	TOOLTIPTEXT *pTTT = (TOOLTIPTEXT *)pTTTStruct;
+	
+	// for multi-line tooltips
+	::SendMessageW(pTTT->hdr.hwndFrom, TTM_SETMAXTIPWIDTH, 0, 150);
+
+	if (pTTT->uFlags & TTF_IDISHWND)
+	{
+		UINT_PTR ControlID = ::GetDlgCtrlID((HWND)pTTTStruct->idFrom);
+
+		PWCHAR OutputString = L"";
+		if (ControlID == TrackingEnabled.GetDlgCtrlID())
+			OutputString = L"Turn tracking off before launching a Rift app to avoid conflicts.";
+		if (ControlID == RestrictCursor.GetDlgCtrlID())
+			OutputString = L"Restrict the mouse cursor so that it stays within your field of view.";
+		if (ControlID == SBS3DMode.GetDlgCtrlID())
+			OutputString = L"View side by side 3D content. Make sure to set the image width.";
+		if (ControlID == DisableComposition.GetDlgCtrlID())
+			OutputString = L"Deskope works best with desktop composition off.\n(Vista and 7 only)";
+		if (ControlID == ImageSeparation.GetDlgCtrlID())
+			OutputString = L"Adjust to match your interpupillary distance (IPD).";
+		if (ControlID == PixelsPerDegree.GetDlgCtrlID())
+			OutputString = L"Pixels of screen movement per degree of head rotation.";
+		if (ControlID == ScreenCaptureRate.GetDlgCtrlID())
+			OutputString = L"Experimental\nRate at which the screen is captured (Deskope always tries to redraw at 60fps).";
+		if (ControlID == SideBySideWidth.GetDlgCtrlID())
+			OutputString = L"Set this to the total width (including left and right image) of SBS 3D image.";
+		pTTT->lpszText = OutputString;
+		return(TRUE);
+	}
+	return(FALSE);
+}
+
+void CDeskopeDlg::OnBnClickedApplybutton()
+{
+	SendSBSInfo();
+	SendCaptureRate();
+}
+
+void CDeskopeDlg::OnHotKey(UINT nHotKeyId, UINT nKey1, UINT nKey2)
+{
+	if (nHotKeyId == HK_SBS3D) {
+		SBS3DMode.SetCheck(!SBS3DMode.GetCheck());
+		OnBnClickedSidebysidecheck();
+	}
+	if (nHotKeyId == HK_CENTER_SCREEN) {
+		OnBnClickedResetOrientation();
+	}
+	if (nHotKeyId == HK_RESTRICT_CURSOR) {
+		RestrictCursor.SetCheck(!RestrictCursor.GetCheck());
+		OnBnClickedRestrictcursor();
+	}
+}
+
+void CDeskopeDlg::OnBnClickedHotkeysbutton()
+{
+	MessageBoxW(L"Pressing the Windows Key and a letter will trigger the following actions: \nZ : Toggle SBS 3D Mode\nX : Toggle Restricted Cursor\nC : Recenter Screen", L"Hotkeys", MB_ICONQUESTION | MB_OK | MB_SYSTEMMODAL);
 }

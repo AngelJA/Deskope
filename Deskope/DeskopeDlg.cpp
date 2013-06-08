@@ -138,10 +138,17 @@ BOOL CDeskopeDlg::OnInitDialog()
 	SetIcon(m_hIcon, TRUE);			// Set big icon
 	SetIcon(m_hIcon, FALSE);		// Set small icon
 
+	// Get Windows version
+	OSVersion.dwOSVersionInfoSize = sizeof(OSVERSIONINFOW);
+	GetVersionExW(&OSVersion);
+
 	// Setup hotkeys
-	RegisterHotKey(GetSafeHwnd(), HK_SBS3D, MOD_NOREPEAT | MOD_WIN, 0x5A); // Windows + Z
-	RegisterHotKey(GetSafeHwnd(), HK_CENTER_SCREEN, MOD_NOREPEAT | MOD_WIN, 0X43); // Windows + C
-	RegisterHotKey(GetSafeHwnd(), HK_RESTRICT_CURSOR, MOD_NOREPEAT | MOD_WIN, 0X58); // Windows + X
+	HWND appHwnd = GetSafeHwnd();
+	RegisterHotKey(appHwnd, HK_SBS3D, MOD_NOREPEAT | MOD_CONTROL | MOD_SHIFT, 0x5A); // Ctrl + Shift + Z
+	RegisterHotKey(appHwnd, HK_CENTER_SCREEN, MOD_NOREPEAT | MOD_CONTROL | MOD_SHIFT, 0X43); // Ctrl + Shift + C
+	RegisterHotKey(appHwnd, HK_RESTRICT_CURSOR, MOD_NOREPEAT | MOD_CONTROL | MOD_SHIFT, 0X58); // Ctrl + Shift + X
+	RegisterHotKey(appHwnd, HK_ZOOM_OUT, MOD_NOREPEAT | MOD_CONTROL | MOD_SHIFT, VK_DOWN); // Ctrl + Shift + Down
+	RegisterHotKey(appHwnd, HK_ZOOM_IN, MOD_NOREPEAT | MOD_CONTROL | MOD_SHIFT, VK_UP); // Ctrl + Shift + Up
 
 	// Initialize controls with settings from registry
 	Zoom.SetRange(GetRegistryInt(REG_ZOOM_MIN, DEFAULT_ZOOM_MIN),
@@ -158,7 +165,12 @@ BOOL CDeskopeDlg::OnInitDialog()
 	
 	RestrictCursor.SetCheck(GetRegistryInt(REG_CLIP_CURSOR, DEFAULT_CLIP_CURSOR));
 	SBS3DMode.SetCheck(GetRegistryInt(REG_SBS_MODE, DEFAULT_SBS_MODE));
-	DisableComposition.SetCheck(GetRegistryInt(REG_DISABLE_COMPOSITION, DEFAULT_DISABLE_COMPOSITION));
+
+	if (OSVersion.dwMajorVersion < 6 || OSVersion.dwMinorVersion > 1) // if not Vista or 7
+		DisableComposition.EnableWindow(FALSE);
+	else
+		DisableComposition.SetCheck(GetRegistryInt(REG_DISABLE_COMPOSITION, DEFAULT_DISABLE_COMPOSITION));
+
 	TrackingEnabled.SetCheck(GetRegistryInt(REG_TRACKING_ENABLED, DEFAULT_TRACKING_ENABLED));
 
 	CStringW strSBSWidth;
@@ -361,10 +373,12 @@ void CDeskopeDlg::SendCaptureRate()
 
 void CDeskopeDlg::OnBnClickedDisableComposition()
 {
-	if (DisableComposition.GetCheck())
-		DwmEnableComposition(DWM_EC_DISABLECOMPOSITION);
-	else
-		DwmEnableComposition(DWM_EC_ENABLECOMPOSITION);
+	if (!(OSVersion.dwMajorVersion < 6 || OSVersion.dwMinorVersion > 1)) { // if Vista or 7
+		if (DisableComposition.GetCheck())
+			DwmEnableComposition(DWM_EC_DISABLECOMPOSITION);
+		else
+			DwmEnableComposition(DWM_EC_ENABLECOMPOSITION);
+	}
 }
 
 
@@ -427,9 +441,17 @@ void CDeskopeDlg::OnHotKey(UINT nHotKeyId, UINT nKey1, UINT nKey2)
 		RestrictCursor.SetCheck(!RestrictCursor.GetCheck());
 		OnBnClickedRestrictcursor();
 	}
+	if (nHotKeyId == HK_ZOOM_IN) {
+		Zoom.SetPos(Zoom.GetPos() + 1);
+		OnHScroll(0, Zoom.GetPos(), reinterpret_cast<CScrollBar*>(&Zoom));
+	}
+	if (nHotKeyId == HK_ZOOM_OUT) {
+		Zoom.SetPos(Zoom.GetPos() - 1);
+		OnHScroll(0, Zoom.GetPos(), reinterpret_cast<CScrollBar*>(&Zoom));
+	}
 }
 
 void CDeskopeDlg::OnBnClickedHotkeysbutton()
 {
-	MessageBoxW(L"Pressing the Windows Key and a letter will trigger the following actions: \nZ : Toggle SBS 3D Mode\nX : Toggle Restricted Cursor\nC : Recenter Screen", L"Hotkeys", MB_ICONQUESTION | MB_OK | MB_SYSTEMMODAL);
+	MessageBoxW(L"Pressing Ctrl + Shift + a third key will trigger the following actions: \nZ : Toggle SBS 3D Mode\nX : Toggle Restricted Cursor\nC : Recenter Screen\nUp : Zoom In\nDown : Zoom Out", L"Hotkeys", MB_ICONQUESTION | MB_OK | MB_SYSTEMMODAL);
 }

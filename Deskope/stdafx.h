@@ -19,9 +19,7 @@
 #include <afxwin.h>         // MFC core and standard components
 #include <afxext.h>         // MFC extensions
 
-
 #include <afxdisp.h>        // MFC Automation classes
-
 
 
 #ifndef _AFX_NO_OLE_SUPPORT

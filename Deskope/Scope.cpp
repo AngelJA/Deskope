@@ -7,7 +7,7 @@ Scope::Scope() : m_fltYaw(0),
 				 m_boolTracking(false),
 				 m_intDrawRate(60),
 				 m_intCaptureRate(60),
-				 m_fltCursorBorder(0.3)
+				 m_fltCursorBorder(float(0.3))
 {
 	m_intCursorWidth = GetSystemMetrics(SM_CXCURSOR);
 	m_intCursorHeight = GetSystemMetrics(SM_CYCURSOR);
@@ -25,7 +25,7 @@ Scope::~Scope()
 int Scope::Initialize()
 {
 	if (SetUpRift() < 0) {
-		MessageBoxW(m_hwnd, L"Error setting up Rift.", L"Error", MB_OK | MB_ICONERROR | MB_SYSTEMMODAL);
+		MessageBoxW(m_hwnd, L"Error setting up the Rift.", L"Error", MB_OK | MB_ICONERROR | MB_SYSTEMMODAL);
 		return -1;
 	}
 	if (GetRiftDisplayInfo() < 0) {
@@ -285,7 +285,7 @@ void Scope::GetSourceCoordinates(int *x, int *y)
 	else {
 		POINT p;
 		GetCursorPos(&p);
-		*x = p.x - (m_intSrcWidth + m_intSBSOffset + m_intImageSeparation / m_fltZoom) / 2;
+		*x = p.x - int((m_intSrcWidth + m_intSBSOffset + m_intImageSeparation / m_fltZoom) / 2);
 		*y = p.y - m_intSrcHeight / 2; 
 	}
 }

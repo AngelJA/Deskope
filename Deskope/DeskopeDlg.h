@@ -9,6 +9,8 @@
 #define HK_SBS3D 1
 #define HK_CENTER_SCREEN 2
 #define HK_RESTRICT_CURSOR 3
+#define HK_ZOOM_IN 4
+#define HK_ZOOM_OUT 5
 
 // program defaults
 #define DEFAULT_SEPARATION 110
@@ -95,6 +97,7 @@ private:
 	CEdit ScreenCaptureRate;
 	void SendSBSInfo();
 	void SendCaptureRate();
+	OSVERSIONINFOW OSVersion;
 	BOOL ToolTipFunction( UINT id, NMHDR * pTTTStruct, LRESULT * pResult );
 	// get registry int or write default value to registry and return it
 	int GetRegistryInt(CStringW, int);
@@ -106,7 +109,6 @@ private:
 	afx_msg void OnEnChangeEdit1();
 	afx_msg void OnBnClickedDisableComposition();
 	afx_msg void OnBnClickedEnableTracking();
-public:
 	afx_msg void OnBnClickedApplybutton();
 	afx_msg void OnBnClickedHotkeysbutton();
 };

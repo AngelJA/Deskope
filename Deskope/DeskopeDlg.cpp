@@ -148,8 +148,8 @@ BOOL CDeskopeDlg::OnInitDialog()
 	RegisterHotKey(appHwnd, HK_SBS3D, mod_norepeat | MOD_CONTROL | MOD_SHIFT, 0x5A); // Ctrl + Shift + Z
 	RegisterHotKey(appHwnd, HK_CENTER_SCREEN, mod_norepeat | MOD_CONTROL | MOD_SHIFT, 0X43); // Ctrl + Shift + C
 	RegisterHotKey(appHwnd, HK_RESTRICT_CURSOR, mod_norepeat | MOD_CONTROL | MOD_SHIFT, 0X58); // Ctrl + Shift + X
-	RegisterHotKey(appHwnd, HK_ZOOM_OUT, MOD_CONTROL | MOD_SHIFT, VK_DOWN); // Ctrl + Shift + Down
-	RegisterHotKey(appHwnd, HK_ZOOM_IN, MOD_CONTROL | MOD_SHIFT, VK_UP); // Ctrl + Shift + Up
+	RegisterHotKey(appHwnd, HK_ZOOM_OUT, mod_norepeat | MOD_CONTROL | MOD_SHIFT, VK_DOWN); // Ctrl + Shift + Down
+	RegisterHotKey(appHwnd, HK_ZOOM_IN, mod_norepeat | MOD_CONTROL | MOD_SHIFT, VK_UP); // Ctrl + Shift + Up
 
 	// Initialize controls with settings from registry
 	Zoom.SetRange(GetRegistryInt(REG_ZOOM_MIN, DEFAULT_ZOOM_MIN),
